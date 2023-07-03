@@ -76,23 +76,9 @@ struct ContactModel
     double Rc;
 
     ContactModel(){};
-    ContactModel( const double _delta, const double _Rc, const PosType& x, const PosType& u )
+    ContactModel( const double _delta, const double _Rc )
         : delta( _delta ){}, // PD horizon
         : Rc( _Rc ){};       // Contact radius
-
-        // Create contact neighbor list
-        double mesh_min[3] = { particles->ghost_mesh_lo[0],
-                               particles->ghost_mesh_lo[1],
-                               particles->ghost_mesh_lo[2] };
-        double mesh_max[3] = { particles->ghost_mesh_hi[0],
-                               particles->ghost_mesh_hi[1],
-                               particles->ghost_mesh_hi[2] };
-        const auto x = particles->slice_x();
-        auto u = particles->slice_u();
-        auto y = x + u;
-        contact_neighbors = std::make_shared<neighbor_type>( y, 0, particles->n_local,
-                                                     contact_model.Rc, 1.0,
-                                                     mesh_min, mesh_max );
 };
 
 /* Normal repulsion */
@@ -107,8 +93,7 @@ struct NormalRepulsionModel : public ContactModel
 
     NormalRepulsionModel(){};
     NormalRepulsionModel( const double delta, const double Rc, const double K )
-        : ContactModel( delta ),
-        : ContactModel( Rc )
+        : ContactModel( delta ), ContactModel( Rc )
     {
         set_param( delta, Rc, K );
     }
@@ -128,7 +113,7 @@ struct NormalRepulsionModel : public ContactModel
 template <class PosType>
 KOKKOS_INLINE_FUNCTION void
 getDistanceComponents( const PosType& x, const PosType& u, const int i,
-                       const int j, double& xi, double& r, // double& s,
+                       const int j, double& xi, double& r, 
                        double& rx, double& ry, double& rz )
 {
     // Get the reference positions and displacements.
@@ -143,16 +128,14 @@ getDistanceComponents( const PosType& x, const PosType& u, const int i,
     rz = xi_z + eta_w;
     r = sqrt( rx * rx + ry * ry + rz * rz );
     xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
- //   s = ( r - xi ) / xi;
 }
 
 template <class PosType>
 KOKKOS_INLINE_FUNCTION void getDistance( const PosType& x, const PosType& u,
                                          const int i, const int j, double& xi,
-                                         double& r) //, double& s )
+                                         double& r) 
 {
     double rx, ry, rz;
-    //getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
     getDistanceComponents( x, u, i, j, xi, r, rx, ry, rz );
 }
 
@@ -168,6 +151,9 @@ class Contact<ExecutionSpace, NormalRepulsionModel>
 
   public:
     using exec_space = ExecutionSpace;
+    using neighbor_type =
+        Cabana::VerletList<memory_space, Cabana::FullNeighborTag,
+                           Cabana::VerletLayout2D, Cabana::TeamOpTag>;
 
     Contact( const bool half_neigh, const NormalRepulsionModel model )
         : _half_neigh( half_neigh )
@@ -187,29 +173,42 @@ class Contact<ExecutionSpace, NormalRepulsionModel>
         auto c = _model.c;
         const auto vol = particles.slice_vol();
 
+        // Create contact neighbor list
+        double mesh_min[3] = { particles->ghost_mesh_lo[0],
+                               particles->ghost_mesh_lo[1],
+                               particles->ghost_mesh_lo[2] };
+        double mesh_max[3] = { particles->ghost_mesh_hi[0],
+                               particles->ghost_mesh_hi[1],
+                               particles->ghost_mesh_hi[2] };
+        const auto x = particles->slice_x();
+        auto u = particles->slice_u();
+        auto y = x + u;
+        contact_neighbors = std::make_shared<neighbor_type>( y, 0, particles->n_local,
+                                                     contact_model.Rc, 1.0,
+                                                     mesh_min, mesh_max );
+
         auto contact_full = KOKKOS_LAMBDA( const int i, const int j )
         {
-            double fx_i = 0.0;
-            double fy_i = 0.0;
-            double fz_i = 0.0;
+            double fcx_i = 0.0;
+            double fcy_i = 0.0;
+            double fcz_i = 0.0;
 
             double xi, r, s;
             double rx, ry, rz;
-            // getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
             getDistanceComponents( x, u, i, j, xi, r, rx, ry, rz );
-            // Normal repulsion uses a 15 factor compared to the PMB force
 
             // Contact "stretch"
             const double sc = (r - Rc)/delta;
 
+            // Normal repulsion uses a 15 factor compared to the PMB force
             const double coeff = 15 * c * sc * vol( j );
-            fx_i = coeff * rx / r;
-            fy_i = coeff * ry / r;
-            fz_i = coeff * rz / r;
+            fcx_i = coeff * rx / r;
+            fcy_i = coeff * ry / r;
+            fcz_i = coeff * rz / r;
 
-            f( i, 0 ) += fx_i;
-            f( i, 1 ) += fy_i;
-            f( i, 2 ) += fz_i;
+            fc( i, 0 ) += fcx_i;
+            fc( i, 1 ) += fcy_i;
+            fc( i, 2 ) += fcz_i;
         };
 
         Kokkos::RangePolicy<exec_space> policy( 0, n_local );
@@ -219,81 +218,7 @@ class Contact<ExecutionSpace, NormalRepulsionModel>
     }
 };
 
-template <class ExecutionSpace>
-class Force<ExecutionSpace, PMBDamageModel>
-    : public Force<ExecutionSpace, PMBModel>
-{
-  protected:
-    using base_type = Force<ExecutionSpace, PMBModel>;
-    using base_type::_half_neigh;
-    PMBDamageModel _model;
-
-  public:
-    using exec_space = ExecutionSpace;
-
-    Force( const bool half_neigh, const PMBDamageModel model )
-        : base_type( half_neigh, model )
-        , _model( model )
-    {
-    }
-
-    template <class ForceType, class PosType, class ParticleType,
-              class NeighListType, class MuView, class ParallelType>
-    void compute_force_full( ForceType& f, const PosType& x, const PosType& u,
-                             const ParticleType& particles,
-                             const NeighListType& neigh_list, MuView& mu,
-                             const int n_local, ParallelType& ) const
-    {
-        auto c = _model.c;
-        auto break_coeff = _model.bond_break_coeff;
-        const auto vol = particles.slice_vol();
-
-        auto force_full = KOKKOS_LAMBDA( const int i )
-        {
-            std::size_t num_neighbors =
-                Cabana::NeighborList<NeighListType>::numNeighbor( neigh_list,
-                                                                  i );
-            for ( std::size_t n = 0; n < num_neighbors; n++ )
-            {
-                if ( mu( i, n ) > 0 )
-                {
-                    double fx_i = 0.0;
-                    double fy_i = 0.0;
-                    double fz_i = 0.0;
-
-                    std::size_t j =
-                        Cabana::NeighborList<NeighListType>::getNeighbor(
-                            neigh_list, i, n );
-
-                    // Get the reference positions and displacements.
-                    double xi, r, s;
-                    double rx, ry, rz;
-                    getDistanceComponents( x, u, i, j, xi, r, s, rx, ry, rz );
-
-                    if ( r * r >= break_coeff * xi * xi )
-                        mu( i, n ) = 0;
-                    if ( mu( i, n ) > 0 )
-                    {
-                        const double coeff = c * s * vol( j );
-                        double muij = mu( i, n );
-                        fx_i = muij * coeff * rx / r;
-                        fy_i = muij * coeff * ry / r;
-                        fz_i = muij * coeff * rz / r;
-
-                        f( i, 0 ) += fx_i;
-                        f( i, 1 ) += fy_i;
-                        f( i, 2 ) += fz_i;
-                    }
-                }
-            }
-        };
-
-        Kokkos::RangePolicy<exec_space> policy( 0, n_local );
-        Kokkos::parallel_for( "CabanaPD::ForcePMBDamage::compute_full", policy,
-                              force_full );
-    }
-};
-
+/*
 template <class ForceType, class ParticleType, class NeighListType,
           class ParallelType>
 void compute_force( const ForceType& force, ParticleType& particles,
@@ -323,6 +248,7 @@ void compute_force( const ForceType& force, ParticleType& particles,
                                   neigh_op_tag );
     Kokkos::fence();
 }
+*/
 
 } // namespace CabanaPD
 
