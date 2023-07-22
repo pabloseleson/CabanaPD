@@ -78,8 +78,8 @@ struct ContactModel
 
     ContactModel(){};
     ContactModel( const double _delta, const double _Rc )
-        : delta( _delta ){}, // PD horizon
-        : Rc( _Rc ){};       // Contact radius
+        : delta( _delta ){},  // PD horizon
+         Rc( _Rc ){};         // Contact radius
 };
 
 /* Normal repulsion */
