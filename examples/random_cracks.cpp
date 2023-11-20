@@ -12,6 +12,8 @@
 #include <fstream>
 #include <iostream>
 
+#include <math.h>
+
 #include "mpi.h"
 
 #include <Kokkos_Core.hpp>
@@ -46,7 +48,8 @@ int main( int argc, char* argv[] )
         std::array<double, 3> high_corner = { high_x, high_y, high_z };
 
         // Time
-        double t_final = 43e-6;
+        // double t_final = 43e-6;
+        double t_final = 50e-8;
         double dt = 5e-8;
         double output_frequency = 5;
         bool output_reference = true;
@@ -66,83 +69,75 @@ int main( int argc, char* argv[] )
             delta / ( ( high_corner[0] - low_corner[0] ) / num_cell[0] ) );
         int halo_width = m + 1;
 
-        // Prenotch
-        // double L_prenotch = height / 2.0;
-        // double y_prenotch1 = 0.0;
-        // Kokkos::Array<double, 3> p01 = { low_x, y_prenotch1, low_z };
-        // Kokkos::Array<double, 3> v1 = { L_prenotch, 0, 0 };
-        // Kokkos::Array<double, 3> v2 = { 0, 0, thickness };
-        // Kokkos::Array<Kokkos::Array<double, 3>, 1> notch_positions = { p01 };
-        // CabanaPD::Prenotch<1> prenotch( v1, v2, notch_positions );
-
         // Multiple random pre-notches
 
         // Number of pre-notches
-        constexpr int Npn = 15;
+        constexpr int Npn = 10;
 
-        // Initialize pre-notch positions array
+        // Minimum and maximum pre-notch length
+        double minl = 0.005;
+        double maxl = 0.01;
+
+        // Initialize pre-notch arrays
         Kokkos::Array<Kokkos::Array<double, 3>, Npn> notch_positions;
+        Kokkos::Array<Kokkos::Array<double, 3>, Npn> notch_v1;
+        Kokkos::Array<Kokkos::Array<double, 3>, Npn> notch_v2;
 
-        // Minimum possible pre-notch length
-        double minl = 0.01;
-
-        // Maximim possible pre-notch length
-        double maxl = 0.025;
-
-        // Initialize pre-notch endpoint
-        // double Xc1 = 0.0;
-        // double Yc1 = 0.0;
-
-        // Define Pi constant
-        double Pi = 3.141592653589793;
-
-        // Initialize pre-notch length and orientation angle
-        double l = maxl;
-        // double theta = 0.0;
-
-        // Initialize random number generator
-        // srand( (unsigned)time( &t ) );
-
-        // Pre-notch vectors
-        Kokkos::Array<double, 3> v1 = { l, 0, 0 };
+        // Fixed v1 and v2 vectors (temporatily)
+        double L_prenotch = height / 2.0;
+        Kokkos::Array<double, 3> v1 = { L_prenotch, 0, 0 };
         Kokkos::Array<double, 3> v2 = { 0, 0, thickness };
 
+        // Loop over pre-notches
         for ( int n = 0; n < Npn; n++ )
         {
+            // Random numbers for pre-notch position
+            double random_number_x = std::rand() / double( RAND_MAX );
+            double random_number_y = std::rand() / double( RAND_MAX );
+            // std::cout << n  << " : rand 1: " << random_number_x << " : rand
+            // 2: " << random_number_y << " Pi: " << M_PI << std::endl;
+
             // Coordinates of one endpoint of the pre-notch (random)
-            // Note: the addition and subtraction of "maxl" ensures
-            //       the prenotch does not extend outside the domain
-            double Xc1 = ( low_x + maxl ) +
-                         ( ( high_x - maxl ) - ( low_x + maxl ) ) * rand();
-            double Yc1 = ( low_y + maxl ) +
-                         ( ( high_y - maxl ) - ( low_y + maxl ) ) * rand();
-
-            // Random pre-notch length
-            // double l = minl + ( maxl - minl ) * rand();
-
-            // Random orientation
-            // double theta = ( 2 * Pi ) * rand();
-
+            // Note: the addition and subtraction of "maxl" ensures the prenotch
+            // does not extend outside the domain
+            double Xc1 =
+                ( low_x + maxl ) +
+                ( ( high_x - maxl ) - ( low_x + maxl ) ) * random_number_x;
+            double Yc1 =
+                ( low_y + maxl ) +
+                ( ( high_y - maxl ) - ( low_y + maxl ) ) * random_number_y;
             Kokkos::Array<double, 3> p0 = { Xc1, Yc1, low_z };
-            // Kokkos::Array<double, 3> v1 = { l * cos( theta ), l * sin( theta
-            // ),
-            //                                 0 };
-            // Kokkos::Array<double, 3> v2 = { 0, 0, thickness };
-
-            // CabanaPD::Prenotch<Npn> prenotch( v1, v2, notch_positions );
-
-            // This line needs to be extended to accummulate notches within the
-            // loop
-            // Kokkos::Array<Kokkos::Array<double, 3>, 2> notch_positions = {
-            //   p01, p02 };
+            // std::cout << n  << " " << Xc1 << " " << Yc1 << " " << low_z <<
+            // std::endl;
 
             // Assign pre-notch position
             notch_positions[n] = p0;
+
+            //  Pre-notch length on x-y plane
+            double random_number_l = std::rand() / double( RAND_MAX );
+            double l = minl + ( maxl - minl ) * random_number_l;
+
+            // Random orientation
+            double random_number_theta = std::rand() / double( RAND_MAX );
+            double theta = M_PI * random_number_theta;
+
+            // std::cout << n  << " : rand 3: " << random_number_l << " : rand
+            // 4: " << random_number_theta << std::endl; std::cout << "l = " <<
+            // " " << l << " ; theta = " << 180*theta/M_PI << " deg." <<
+            // std::endl; std::cout << "l*cos(theta) = " << " " << l * cos(
+            // theta ) << " ; l * sin( theta) = " << l * sin( theta) << " " <<
+            // std::endl;
+
+            // Assign pre-notch length
+            Kokkos::Array<double, 3> v1_temp = { l * cos( theta ),
+                                                 l * sin( theta ), 0 };
+            notch_v1[n] = v1_temp;
         }
 
         // This line needs to be extended to have a list of v1, so that each
         // pre-notch has a different orientation
         CabanaPD::Prenotch<Npn> prenotch( v1, v2, notch_positions );
+        // CabanaPD::Prenotch<Npn> prenotch( notch_v1, v2, notch_positions );
 
         // Choose force model type.
         using model_type =
