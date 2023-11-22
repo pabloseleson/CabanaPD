@@ -57,6 +57,7 @@ int main( int argc, char* argv[] )
         double K = E / ( 3 * ( 1 - 2 * nu ) ); // [Pa]
         double rho0 = 2440;                    // [kg/m^3]
         double G0 = 3.8;                       // [J/m^2]
+        double G = E / ( 2.0 * ( 1.0 + nu ) ); // Only for LPS.
 
         // PD horizon
         double delta = 0.001 + 1e-10;
@@ -76,9 +77,12 @@ int main( int argc, char* argv[] )
         CabanaPD::Prenotch<1> prenotch( v1, v2, notch_positions );
 
         // Choose force model type.
+        // using model_type =
+        //    CabanaPD::ForceModel<CabanaPD::PMB, CabanaPD::Fracture>;
+        // model_type force_model( delta, K, G0 );
         using model_type =
-            CabanaPD::ForceModel<CabanaPD::PMB, CabanaPD::Fracture>;
-        model_type force_model( delta, K, G0 );
+            CabanaPD::ForceModel<CabanaPD::LPS, CabanaPD::Fracture>;
+        model_type force_model( delta, K, G, G0 );
         CabanaPD::Inputs<3> inputs( num_cell, low_corner, high_corner, t_final,
                                     dt, output_frequency, output_reference );
         inputs.read_args( argc, argv );

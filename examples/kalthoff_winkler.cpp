@@ -54,7 +54,7 @@ int main( int argc, char* argv[] )
         double K = E / ( 3.0 * ( 1.0 - 2.0 * nu ) ); // [Pa]
         double rho0 = 8000;                          // [kg/m^3]
         double G0 = 42408;                           // [J/m^2]
-        // double G = E / ( 2.0 * ( 1.0 + nu ) ); // Only for LPS.
+        double G = E / ( 2.0 * ( 1.0 + nu ) );       // Only for LPS.
 
         double v0 = 16;              // [m/sec] (Half impactor's velocity)
         double L_prenotch = 0.05;    // [m] (50 mm)
@@ -76,12 +76,12 @@ int main( int argc, char* argv[] )
         int halo_width = m + 1; // Just to be safe.
 
         // Choose force model type.
-        using model_type =
-            CabanaPD::ForceModel<CabanaPD::PMB, CabanaPD::Fracture>;
-        model_type force_model( delta, K, G0 );
         // using model_type =
-        //     CabanaPD::ForceModel<CabanaPD::LPS, CabanaPD::Fracture>;
-        // model_type force_model( delta, K, G, G0 );
+        //    CabanaPD::ForceModel<CabanaPD::PMB, CabanaPD::Fracture>;
+        // model_type force_model( delta, K, G0 );
+        using model_type =
+            CabanaPD::ForceModel<CabanaPD::LPS, CabanaPD::Fracture>;
+        model_type force_model( delta, K, G, G0 );
         CabanaPD::Inputs<3> inputs( num_cell, low_corner, high_corner, t_final,
                                     dt, output_frequency, output_reference );
         inputs.read_args( argc, argv );
