@@ -11,6 +11,7 @@
 
 #include <fstream>
 #include <iostream>
+#include <random>
 
 #include <math.h>
 
@@ -49,7 +50,6 @@ int main( int argc, char* argv[] )
 
         // Time
         double t_final = 43e-6;
-        // double t_final = 50e-8;
         double dt = 5e-8;
         double output_frequency = 5;
         bool output_reference = true;
@@ -83,15 +83,18 @@ int main( int argc, char* argv[] )
         Kokkos::Array<Kokkos::Array<double, 3>, Npn> notch_v1;
         Kokkos::Array<Kokkos::Array<double, 3>, Npn> notch_v2;
 
-        // Fixed pre-notch v2 vector
-        Kokkos::Array<double, 3> v2 = { 0, 0, thickness };
+        // Reference for random number generator:
+        // https://en.cppreference.com/w/cpp/numeric/random/uniform_real_distribution
+        std::random_device rd;
+        std::mt19937 gen( rd() );
+        std::uniform_real_distribution<> dis( 0.0, 1.0 );
 
         // Loop over pre-notches
         for ( int n = 0; n < Npn; n++ )
         {
             // Random numbers for pre-notch position
-            double random_number_x = std::rand() / double( RAND_MAX );
-            double random_number_y = std::rand() / double( RAND_MAX );
+            double random_number_x = dis( gen );
+            double random_number_y = dis( gen );
 
             // Coordinates of one endpoint of the pre-notch (random)
             // Note: the addition and subtraction of "maxl" ensures the prenotch
@@ -107,18 +110,26 @@ int main( int argc, char* argv[] )
             // Assign pre-notch position
             notch_positions[n] = p0;
 
-            //  Pre-notch length on xy-plane
-            double random_number_l = std::rand() / double( RAND_MAX );
+            //  Random pre-notch length on XY-plane
+            double random_number_l = dis( gen );
             double l = minl + ( maxl - minl ) * random_number_l;
 
-            // Random orientation on xy-plane
-            double random_number_theta = std::rand() / double( RAND_MAX );
+            // Random pre-notch orientation on XY-plane
+            double random_number_theta = dis( gen );
             double theta = M_PI * random_number_theta;
 
-            // Assign pre-notch v1 vector
-            Kokkos::Array<double, 3> v1_temp = { l * cos( theta ),
-                                                 l * sin( theta ), 0 };
-            notch_v1[n] = v1_temp;
+            // Pre-notch v1 vector
+            Kokkos::Array<double, 3> v1 = { l * cos( theta ), l * sin( theta ),
+                                            0 };
+            notch_v1[n] = v1;
+
+            // Pre-notch v2 vector
+
+            // Random number for y-component of v2: the angle of v2 in the
+            // YZ-plane is between 0 and 45 deg.
+            double random_number_v2_y = dis( gen );
+            Kokkos::Array<double, 3> v2 = { 0, random_number_v2_y * thickness,
+                                            thickness };
             notch_v2[n] = v2;
         }
 
