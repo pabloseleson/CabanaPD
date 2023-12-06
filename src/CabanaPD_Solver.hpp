@@ -121,6 +121,7 @@ class SolverElastic
         other_time = 0;
         last_time = 0;
         init_time = 0;
+	neighbor_time = 0;
         total_timer.reset();
         init_timer.reset();
 
@@ -136,7 +137,8 @@ class SolverElastic
         comm = std::make_shared<comm_type>( *particles );
 
         // Create the neighbor list.
-        double mesh_min[3] = { particles->ghost_mesh_lo[0],
+        neighbor_timer.reset();
+	double mesh_min[3] = { particles->ghost_mesh_lo[0],
                                particles->ghost_mesh_lo[1],
                                particles->ghost_mesh_lo[2] };
         double mesh_max[3] = { particles->ghost_mesh_hi[0],
@@ -146,7 +148,8 @@ class SolverElastic
         neighbors = std::make_shared<neighbor_type>( x, 0, particles->n_local,
                                                      force_model.delta, 1.0,
                                                      mesh_min, mesh_max );
-        int max_neighbors =
+        neighbor_time += neighbor_timer.seconds();
+	int max_neighbors =
             Cabana::NeighborList<neighbor_type>::maxNeighbor( *neighbors );
 
         force =
@@ -331,12 +334,14 @@ class SolverElastic
     double other_time;
     double init_time;
     double last_time;
+    double neighbor_time;
     Kokkos::Timer total_timer;
     Kokkos::Timer init_timer;
     Kokkos::Timer force_timer;
     Kokkos::Timer comm_timer;
     Kokkos::Timer integrate_timer;
     Kokkos::Timer other_timer;
+    Kokkos::Timer neighbor_timer;
     bool print;
 };
 
