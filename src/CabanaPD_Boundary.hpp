@@ -211,7 +211,7 @@ struct BoundaryCondition<BCIndexSpace, ForceUpdateBCTag>
     }
 
     template <class ExecSpace, class ParticleType>
-    void apply( ExecSpace, ParticleType& particles )
+    void apply( ExecSpace, ParticleType& particles, double t )
     {
         auto f = particles.sliceForce();
         auto index_space = _index_space._view;
@@ -220,8 +220,9 @@ struct BoundaryCondition<BCIndexSpace, ForceUpdateBCTag>
         Kokkos::parallel_for(
             "CabanaPD::BC::apply", policy, KOKKOS_LAMBDA( const int b ) {
                 auto pid = index_space( b );
-                for ( int d = 0; d < 3; d++ )
-                    f( pid, d ) += value;
+                temp( pid ) = 5000 * x( pid, 1 ) * t;
+                // for ( int d = 0; d < 3; d++ )
+                //     f( pid, d ) += value;
             } );
     }
 };
