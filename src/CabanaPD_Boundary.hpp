@@ -247,7 +247,7 @@ struct BoundaryCondition<BCIndexSpace, ForceCrackBranchBCTag>
     }
 
     template <class ExecSpace, class ParticleType>
-    void apply( ExecSpace, ParticleType& particles )
+    void apply( ExecSpace, ParticleType& particles, double )
     {
         auto f = particles.sliceForce();
         auto x = particles.sliceReferencePosition();
