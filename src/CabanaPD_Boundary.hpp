@@ -152,7 +152,7 @@ struct BoundaryCondition<BCIndexSpace, ZeroBCTag>
     }
 
     template <class ExecSpace, class ParticleType>
-    void apply( ExecSpace, ParticleType )
+    void apply( ExecSpace, ParticleType, double )
     {
     }
 };
@@ -188,8 +188,6 @@ struct BoundaryCondition<BCIndexSpace, ForceValueBCTag>
                 auto pid = index_space( b );
                 // This is specifically for the thermal deformation problem
                 temp( pid ) = 5000 * x( pid, 1 ) * t;
-                std::cout << "1: temp(" << pid << ")=" << temp( pid )
-                          << std::endl;
             } );
     }
 };
@@ -225,8 +223,6 @@ struct BoundaryCondition<BCIndexSpace, ForceUpdateBCTag>
                 auto pid = index_space( b );
                 // This is specifically for the thermal deformation problem
                 temp( pid ) += 5000 * x( pid, 1 ) * t;
-                std::cout << "2: temp(" << pid << ")=" << temp( pid )
-                          << std::endl;
             } );
     }
 };
@@ -263,8 +259,6 @@ struct BoundaryCondition<BCIndexSpace, ForceCrackBranchBCTag>
                 auto pid = index_space( b );
                 // This is specifically for the thermal deformation problem
                 temp( pid ) += 5000 * x( pid, 1 ) * t;
-                std::cout << "3: temp(" << pid << ")=" << temp( pid )
-                          << std::endl;
             } );
     }
 };
@@ -274,7 +268,7 @@ template <class BoundaryType, class BCTag, class ExecSpace, class Particles>
 auto createBoundaryCondition( BCTag, ExecSpace exec_space, Particles particles,
                               std::vector<BoundaryType> planes,
                               const double value,
-                              const double initial_guess = 0.5 )
+                              const double initial_guess = 1.1 )
 {
     using memory_space = typename Particles::memory_space;
     using bc_index_type = BoundaryIndexSpace<memory_space, BoundaryType>;

@@ -192,7 +192,7 @@ class SolverElastic
         computeEnergy( *force, *particles, *neighbors, neigh_iter_tag() );
 
         // Add boundary condition.
-        boundary_condition.apply( exec_space(), *particles );
+        boundary_condition.apply( exec_space(), *particles, 0.0 );
 
         particles->output( 0, 0.0, output_reference );
         init_time += init_timer.seconds();
@@ -231,7 +231,8 @@ class SolverElastic
             force_time += force_timer.seconds();
 
             // Add boundary condition.
-            boundary_condition.apply( exec_space(), *particles );
+            boundary_condition.apply( exec_space(), *particles,
+                                      step * inputs->timestep );
 
             // Integrate - velocity Verlet second half.
             integrate_timer.reset();
