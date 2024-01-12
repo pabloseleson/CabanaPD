@@ -222,7 +222,8 @@ struct BoundaryCondition<BCIndexSpace, ForceUpdateBCTag>
             "CabanaPD::BC::apply", policy, KOKKOS_LAMBDA( const int b ) {
                 auto pid = index_space( b );
                 // This is specifically for the thermal deformation problem
-                temp( pid ) += 5000 * x( pid, 1 ) * t;
+                // temp( pid ) += 5000 * x( pid, 1 ) * t;
+                temp( pid ) = 5000 * x( pid, 1 ) * t;
             } );
     }
 };
@@ -258,7 +259,8 @@ struct BoundaryCondition<BCIndexSpace, ForceCrackBranchBCTag>
             "CabanaPD::BC::apply", policy, KOKKOS_LAMBDA( const int b ) {
                 auto pid = index_space( b );
                 // This is specifically for the thermal deformation problem
-                temp( pid ) += 5000 * x( pid, 1 ) * t;
+                // temp( pid ) += 5000 * x( pid, 1 ) * t;
+                temp( pid ) = 5000 * x( pid, 1 ) * t;
             } );
     }
 };

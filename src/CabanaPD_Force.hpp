@@ -934,6 +934,7 @@ class Force<ExecutionSpace, ForceModel<PMB, Elastic>>
     {
         auto c = _model.c;
         auto alpha = _model.alpha;
+        // auto temp0 = _model.temp0;
         const auto vol = particles.sliceVolume();
         const auto temp = particles.sliceTemperature();
 
@@ -949,10 +950,11 @@ class Force<ExecutionSpace, ForceModel<PMB, Elastic>>
 
             // Compute average temperature
             // It should be:
-            //     double T_av = 0.5*( temp( i ) + temp( j ) ) - temp0;
+            //    double T_av = 0.5*( temp( i ) + temp( j ) ) - temp0;
 
             // assume temp0 = 0 for now
             double T_av = 0.5 * ( temp( i ) + temp( j ) );
+            // double T_av = 0.5*( temp( i ) + temp( j ) ) - temp0;
 
             // Add thermal stretch
             s -= alpha * T_av;
@@ -1077,6 +1079,9 @@ class Force<ExecutionSpace, ForceModel<PMB, Fracture>>
                 // Else if statement is only for performance.
                 else if ( mu( i, n ) > 0 )
                 {
+                    // Add thermal stretch
+                    s -= alpha * T_av;
+
                     const double coeff = c * s * vol( j );
                     double muij = mu( i, n );
                     fx_i = muij * coeff * rx / r;

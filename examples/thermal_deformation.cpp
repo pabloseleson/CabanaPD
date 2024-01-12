@@ -29,7 +29,7 @@ int main( int argc, char* argv[] )
         using exec_space = Kokkos::DefaultExecutionSpace;
         using memory_space = typename exec_space::memory_space;
 
-        std::array<int, 3> num_cell = { 100, 30, 3 };
+        std::array<int, 3> num_cell = { 101, 31, 3 };
         std::array<double, 3> low_corner = { -0.5, 0.0, -0.015 };
         std::array<double, 3> high_corner = { 0.5, 0.3, 0.015 };
         double t_final = 0.0093;
@@ -45,7 +45,7 @@ int main( int argc, char* argv[] )
         double delta = 0.03;
 
         // Reference temperature
-        // double temp0 = 0.0;
+        double temp0 = 0.0;
 
         int m = std::floor(
             delta / ( ( high_corner[0] - low_corner[0] ) / num_cell[0] ) );
@@ -102,6 +102,11 @@ int main( int argc, char* argv[] )
         cabana_pd->init_force();
         cabana_pd->run();
 
+        // ============================
+        // Output displacement profiles
+        // ============================
+        x = particles->sliceReferencePosition();
+        u = particles->sliceDisplacement();
         double num_cell_x = inputs.num_cells[0];
         auto profile = Kokkos::View<double* [2], memory_space>(
             Kokkos::ViewAllocateWithoutInitializing( "displacement_profile" ),
@@ -109,6 +114,44 @@ int main( int argc, char* argv[] )
         int mpi_rank;
         MPI_Comm_rank( MPI_COMM_WORLD, &mpi_rank );
         Kokkos::View<int*, memory_space> count( "c", 1 );
+        double dx = particles->dx[0];
+        double midx = 0.5 * ( low_corner[0] + high_corner[0] );
+        double midy = 0.5 * ( low_corner[1] + high_corner[1] );
+        double midz = 0.5 * ( low_corner[2] + high_corner[2] );
+        auto measure_profile = KOKKOS_LAMBDA( const int pid )
+        {
+            // if ( x( pid, 1 ) < midy + dx / 2.0 && x( pid, 1 ) > midy - dx
+            // / 2.0 &&
+            if ( x( pid, 0 ) < midx + dx / 2.0 &&
+                 x( pid, 0 ) > midx - dx / 2.0 &&
+                 x( pid, 2 ) < midz + dx / 2.0 &&
+                 x( pid, 2 ) > midz - dx / 2.0 )
+            {
+                auto c = Kokkos::atomic_fetch_add( &count( 0 ), 1 );
+                // profile( c, 0 ) = x( pid, 0 );
+                profile( c, 0 ) = x( pid, 1 );
+                profile( c, 1 ) = u( pid, 1 ); // y displacement
+                profile( c, 2 ) = std::sqrt(
+                    u( pid, 0 ) * u( pid, 0 ) + u( pid, 1 ) * u( pid, 1 ) +
+                    u( pid, 2 ) * u( pid, 2 ) ); // displacement magnitude
+            }
+        };
+        Kokkos::RangePolicy<exec_space> policy( 0, x.size() );
+        Kokkos::parallel_for( "displacement_profile", policy, measure_profile );
+        auto count_host =
+            Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace{}, count );
+        auto profile_host =
+            Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace{}, profile );
+        std::fstream fout;
+        // std::string file_name = "displacement_profile_x_direction.txt";
+        std::string file_name = "displacement_profile_y_direction.txt";
+        fout.open( file_name, std::ios::app );
+        for ( int p = 0; p < count_host( 0 ); p++ )
+        {
+            fout << mpi_rank << " " << profile_host( p, 0 ) << " "
+                 << profile_host( p, 1 ) << " " << profile_host( p, 2 )
+                 << std::endl;
+        }
     }
 
     MPI_Finalize();
