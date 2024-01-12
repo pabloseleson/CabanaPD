@@ -108,7 +108,7 @@ int main( int argc, char* argv[] )
         x = particles->sliceReferencePosition();
         u = particles->sliceDisplacement();
         double num_cell_x = inputs.num_cells[0];
-        auto profile = Kokkos::View<double* [2], memory_space>(
+        auto profile = Kokkos::View<double* [3], memory_space>(
             Kokkos::ViewAllocateWithoutInitializing( "displacement_profile" ),
             num_cell_x );
         int mpi_rank;
@@ -120,16 +120,16 @@ int main( int argc, char* argv[] )
         double midz = 0.5 * ( low_corner[2] + high_corner[2] );
         auto measure_profile = KOKKOS_LAMBDA( const int pid )
         {
-            // if ( x( pid, 1 ) < midy + dx / 2.0 && x( pid, 1 ) > midy - dx
-            // / 2.0 &&
-            if ( x( pid, 0 ) < midx + dx / 2.0 &&
-                 x( pid, 0 ) > midx - dx / 2.0 &&
+            if ( x( pid, 1 ) < midy + dx / 2.0 &&
+                 x( pid, 1 ) > midy - dx / 2.0 &&
+                 // if ( x( pid, 0 ) < midx + dx / 2.0 && x( pid, 0 ) > midx -
+                 // dx / 2.0 &&
                  x( pid, 2 ) < midz + dx / 2.0 &&
                  x( pid, 2 ) > midz - dx / 2.0 )
             {
                 auto c = Kokkos::atomic_fetch_add( &count( 0 ), 1 );
-                // profile( c, 0 ) = x( pid, 0 );
-                profile( c, 0 ) = x( pid, 1 );
+                profile( c, 0 ) = x( pid, 0 );
+                // profile( c, 0 ) = x( pid, 1 );
                 profile( c, 1 ) = u( pid, 1 ); // y displacement
                 profile( c, 2 ) = std::sqrt(
                     u( pid, 0 ) * u( pid, 0 ) + u( pid, 1 ) * u( pid, 1 ) +
@@ -143,8 +143,8 @@ int main( int argc, char* argv[] )
         auto profile_host =
             Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace{}, profile );
         std::fstream fout;
-        // std::string file_name = "displacement_profile_x_direction.txt";
-        std::string file_name = "displacement_profile_y_direction.txt";
+        std::string file_name = "displacement_profile_x_direction.txt";
+        // std::string file_name = "displacement_profile_y_direction.txt";
         fout.open( file_name, std::ios::app );
         for ( int p = 0; p < count_host( 0 ); p++ )
         {
