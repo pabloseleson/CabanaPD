@@ -18,7 +18,7 @@
 
 #include <CabanaPD.hpp>
 
-// Simulate thermally-induced deformation in a rectangular plate.
+// Simulate thermally-induced deformation in a cube.
 void thermalDeformationHeatTransferExample( const std::string filename )
 {
     // ====================================================
@@ -104,6 +104,22 @@ void thermalDeformationHeatTransferExample( const std::string filename )
     // ====================================================
     //                   Boundary condition
     // ====================================================
+
+    // Temperature profile imposed on top and bottom surfaces
+    double dy = particles->dx[1];
+    using plane_type = CabanaPD::RegionBoundary<CabanaPD::RectangularPrism>;
+
+    // Top surface: y-direction
+    plane_type plane1( low_corner[0], high_corner[0], high_corner[1] - dy,
+                       high_corner[1] + dy, low_corner[2], high_corner[2] );
+
+    // Bottom surface: y-direction
+    plane_type plane2( low_corner[0], high_corner[0], low_corner[1] - dy,
+                       low_corner[1] + dy, low_corner[2], high_corner[2] );
+
+    std::vector<plane_type> planes = { plane1, plane2 };
+
+    /*
     // Temperature profile imposed on top, bottom, left, and right surfaces
     double dx = particles->dx[0];
     double dy = particles->dx[1];
@@ -135,8 +151,11 @@ void thermalDeformationHeatTransferExample( const std::string filename )
                        high_corner[1], high_corner[2] - dz,
                        high_corner[2] + dz );
 
+    // std::vector<plane_type> planes = { plane1, plane2, plane3,
+    //                                   plane4, plane5, plane6 };
     std::vector<plane_type> planes = { plane1, plane2, plane3,
                                        plane4, plane5, plane6 };
+    */
 
     temp = particles->sliceTemperature();
     // This is purposely delayed until after solver init so that ghosted
@@ -167,6 +186,7 @@ void thermalDeformationHeatTransferExample( const std::string filename )
     createOutputProfile( MPI_COMM_WORLD, num_cells[1], profile_dim, file_name,
                          *particles, value );
 
+    /*
     // Output y-displacement along the x-axis
     createDisplacementProfile( MPI_COMM_WORLD,
                                "ydisplacement_xaxis_profile.txt", *particles,
@@ -186,6 +206,7 @@ void thermalDeformationHeatTransferExample( const std::string filename )
     createDisplacementMagnitudeProfile(
         MPI_COMM_WORLD, "displacement_magnitude_yaxis_profile.txt", *particles,
         num_cells[1], 1 );
+        */
 }
 
 // Initialize MPI+Kokkos.
