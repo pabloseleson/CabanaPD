@@ -18,7 +18,7 @@
 
 #include <CabanaPD.hpp>
 
-// Simulate heat transfer in a cube.
+// Simulate heat transfer in a divertor monoblock geometry.
 void thermalDeformationHeatTransferExample( const std::string filename )
 {
     // ====================================================
@@ -74,6 +74,21 @@ void thermalDeformationHeatTransferExample( const std::string filename )
                                              typename thermal_type::base_type>>(
             exec_space(), low_corner, high_corner, num_cells, halo_width );
 
+    // Do not create particles within given cylindrical region
+    auto x = particles->sliceReferencePosition();
+    double x_center = inputs["cylindrical_hole"][0];
+    double y_center = inputs["cylindrical_hole"][1];
+    double radius = inputs["cylindrical_hole"][2];
+    auto init_op = KOKKOS_LAMBDA( const int, const double x[3] )
+    {
+        if ( ( ( x[0] - x_center ) * ( x[0] - x_center ) +
+               ( x[1] - y_center ) * ( x[1] - y_center ) ) < radius * radius )
+            return false;
+        return true;
+    };
+
+    particles->createParticles( exec_space(), init_op );
+
     // ====================================================
     //            Custom particle initialization
     // ====================================================
@@ -100,6 +115,47 @@ void thermalDeformationHeatTransferExample( const std::string filename )
     // ====================================================
     auto cabana_pd = CabanaPD::createSolverElastic<memory_space>(
         inputs, particles, force_model );
+
+    /*
+        // ====================================================
+        //                   Boundary condition
+        // ====================================================
+        double dx = particles->dx[0];
+        double dy = particles->dx[1];
+        using plane_type = CabanaPD::RegionBoundary<CabanaPD::RectangularPrism>;
+
+        //  Need to reslice to include ghosted particles on the boundary.
+        // temp = particles->sliceTemperature();
+
+        plane_type plane( low_corner[0], high_corner[0], low_corner[1],
+                          high_corner[1], low_corner[2], high_corner[2] );
+        std::vector<plane_type> planes = { plane };
+
+        auto temp_func = KOKKOS_LAMBDA( const int pid, const double t )
+        {
+            double rsq = ( x( pid, 0 ) - x_center ) * ( x( pid, 0 ) - x_center )
+       + ( x( pid, 1 ) - y_center ) * ( x( pid, 1 ) - y_center );
+
+            if ( x( pid, 1 ) >= high_corner[1] - dy &&
+                 x( pid, 1 ) <= high_corner[1] + dy )
+            {
+                // temp( pid ) = temp0 + ( 10000.0 - temp0 ) * t;
+                // temp( pid ) = 2.0 * temp0;
+                temp( pid ) = 0.0;
+            }
+            else if ( x( pid, 1 ) >= low_corner[1] - dy &&
+                 x( pid, 1 ) <= low_corner[1] + dy )
+            {
+                temp( pid ) = 0.0;
+            }
+            else if ( rsq <= ( radius + dx ) * ( radius + dx ) )
+            {
+                //temp( pid ) = 1.5 * temp0;
+                //temp( pid ) = 0.0;
+            }
+        };
+        auto body_term = CabanaPD::createBodyTerm( temp_func, false );
+    */
 
     // ====================================================
     //                   Boundary condition
@@ -132,6 +188,8 @@ void thermalDeformationHeatTransferExample( const std::string filename )
     // ====================================================
     //                   Simulation run
     // ====================================================
+    // cabana_pd->init( body_term );
+    // cabana_pd->run( body_term );
     cabana_pd->init( bc );
     cabana_pd->run( bc );
 
