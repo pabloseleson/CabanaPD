@@ -26,14 +26,16 @@ class HeatTransfer;
 // FIXME: PMB only used here for simplicity because LPS does not support
 // thermo-mechanics yet.
 template <class ExecutionSpace, class... ModelParams>
-class HeatTransfer<ExecutionSpace, ForceModel<PMB, Elastic, ModelParams...>>
+class HeatTransfer<ExecutionSpace,
+                   ForceModel<PMB, Elastic, DynamicTemperature, ModelParams...>>
     : public Force<ExecutionSpace, BaseForceModel>
 {
   protected:
     using base_type = Force<ExecutionSpace, BaseForceModel>;
     using base_type::_half_neigh;
     using base_type::_timer;
-    using model_type = ForceModel<PMB, Elastic, ModelParams...>;
+    using model_type =
+        ForceModel<PMB, Elastic, DynamicTemperature, ModelParams...>;
 
     Timer _euler_timer = base_type::_energy_timer;
     model_type _model;
@@ -98,22 +100,32 @@ class HeatTransfer<ExecutionSpace, ForceModel<PMB, Elastic, ModelParams...>>
 };
 
 template <class ExecutionSpace, class... ModelParams>
-class HeatTransfer<ExecutionSpace, ForceModel<PMB, Fracture, ModelParams...>>
-    : public HeatTransfer<ExecutionSpace,
-                          ForceModel<PMB, Elastic, ModelParams...>>
+class HeatTransfer<ExecutionSpace, ForceModel<PMB, Fracture, DynamicTemperature,
+                                              ModelParams...>>
+    : public HeatTransfer<
+          ExecutionSpace,
+          ForceModel<PMB, Elastic, DynamicTemperature, ModelParams...>>
 {
   protected:
-    using base_type =
-        HeatTransfer<ExecutionSpace, ForceModel<PMB, Elastic, ModelParams...>>;
+    using base_type = HeatTransfer<
+        ExecutionSpace,
+        ForceModel<PMB, Elastic, DynamicTemperature, ModelParams...>>;
     using base_type::_euler_timer;
     using base_type::_half_neigh;
     using base_type::_timer;
-    using model_type = ForceModel<PMB, Fracture, ModelParams...>;
+    using model_type =
+        ForceModel<PMB, Fracture, DynamicTemperature, ModelParams...>;
     model_type _model;
 
   public:
+    // This is necessary because of the indirect model inheritance.
+    // The intent is that these HeatTransfer classes merge as more details are
+    // merged into the respective models.
     HeatTransfer( const bool half_neigh, const model_type model )
-        : base_type( half_neigh )
+        : base_type( half_neigh, typename base_type::model_type(
+                                     model.delta, model.K, model.temperature,
+                                     model.cp, model.alpha, model.temp0,
+                                     model.constant_microconductivity ) )
         , _model( model )
     {
     }
@@ -124,7 +136,7 @@ class HeatTransfer<ExecutionSpace, ForceModel<PMB, Fracture, ModelParams...>>
     computeHeatTransferFull( TemperatureType& conduction, const PosType& x,
                              const PosType& u, const ParticleType& particles,
                              const NeighListType& neigh_list, const MuView& mu,
-                             const int n_local, ParallelType& neigh_op_tag )
+                             const int n_local, ParallelType& )
     {
         _timer.start();
 
@@ -152,8 +164,8 @@ class HeatTransfer<ExecutionSpace, ForceModel<PMB, Fracture, ModelParams...>>
                 // Only include unbroken bonds.
                 if ( mu( i, n ) > 0 )
                 {
-                    const double coeff =
-                        model.thermal_coeff * model.conductivity_function( xi );
+                    const double coeff = model.thermal_coeff *
+                                         model.microconductivity_function( xi );
                     conduction( i ) +=
                         coeff * ( temp( j ) - temp( i ) ) / xi / xi * vol( j );
                 }
@@ -161,10 +173,8 @@ class HeatTransfer<ExecutionSpace, ForceModel<PMB, Fracture, ModelParams...>>
         };
 
         Kokkos::RangePolicy<ExecutionSpace> policy( 0, n_local );
-        Cabana::neighbor_parallel_for(
-            policy, temp_func, neigh_list, Cabana::FirstNeighborsTag(),
-            neigh_op_tag, "CabanaPD::HeatTransfer::computeFull" );
-
+        Kokkos::parallel_for( "CabanaPD::HeatTransfer::computeFull", policy,
+                              temp_func );
         _timer.stop();
     }
 };
@@ -226,7 +236,7 @@ void computeHeatTransfer( HeatTransferType& heat_transfer,
                                                neigh_op_tag );
     Kokkos::fence();
 
-    heat_transfer.stepEuler( particles, dt );
+    heat_transfer.forwardEuler( particles, dt );
     Kokkos::fence();
 }
 
