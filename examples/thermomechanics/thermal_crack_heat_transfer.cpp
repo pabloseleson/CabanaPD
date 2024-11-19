@@ -154,29 +154,11 @@ void thermalCrackExample( const std::string filename )
             temp_infinity = temp0;
         }
 
-        /*
-        // Rescale x and y particle position values
-        double xi = ( 2.0 * x( pid, 0 ) - ( X0 + Xn ) ) / ( Xn - X0 );
-        double eta = ( 2.0 * x( pid, 1 ) - ( Y0 + Yn ) ) / ( Yn - Y0 );
-
-        // Define profile powers in x- and y-directions
-        double sx = 1.0 / 50.0;
-        double sy = 1.0 / 10.0;
-
-        // Define profiles in x- and y-direcions
-        double fx = 1.0 - Kokkos::pow( Kokkos::abs( xi ), 1.0 / sx );
-        double fy = 1.0 - Kokkos::pow( Kokkos::abs( eta ), 1.0 / sy );
-        */
-
-        if ( x( pid, 0 ) < X0 + dx ||
-             x( pid, 0 ) > Xn - dx && x( pid, 1 ) < Y0 + dy ||
-             x( pid, 1 ) > Yn - dy )
+        if ( x( pid, 0 ) < X0 + dx || x( pid, 0 ) > Xn - dx ||
+             x( pid, 1 ) < Y0 + dy || x( pid, 1 ) > Yn - dy )
         {
             temp( pid ) = temp_infinity;
         }
-
-        // Compute particle temperature
-        // temp( pid ) = temp_infinity + ( temp0 - temp_infinity ) * fx * fy;
     };
     auto body_term = CabanaPD::createBodyTerm( temp_func, false );
 
