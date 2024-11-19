@@ -18,8 +18,9 @@
 
 #include <CabanaPD.hpp>
 
-// Simulate heat transfer in a divertor monoblock geometry.
-void thermalDeformationHeatTransferExample( const std::string filename )
+// Simulate heat transfer in a divertor monoblock.
+void thermalDeformationHeatTransferMonoblockExample(
+    const std::string filename )
 {
     // ====================================================
     //             Use default Kokkos spaces
@@ -119,6 +120,7 @@ void thermalDeformationHeatTransferExample( const std::string filename )
     // ====================================================
     //                   Boundary condition
     // ====================================================
+    /*
     double dx = particles->dx[0];
     double dy = particles->dx[1];
     using plane_type = CabanaPD::RegionBoundary<CabanaPD::RectangularPrism>;
@@ -150,6 +152,7 @@ void thermalDeformationHeatTransferExample( const std::string filename )
 
     */
 
+    /*
     auto temp_func = KOKKOS_LAMBDA( const int pid, const double t )
     {
         double rsq = ( x( pid, 0 ) - x_center ) * ( x( pid, 0 ) - x_center ) +
@@ -168,6 +171,57 @@ void thermalDeformationHeatTransferExample( const std::string filename )
     };
     auto bc = CabanaPD::createBoundaryCondition(
         temp_func, exec_space{}, *particles, planes, false, 1.0 );
+
+        */
+
+    // ====================================================
+    //                   Imposed field
+    // ====================================================
+    auto x = particles->sliceReferencePosition();
+    auto f = particles->sliceForce();
+    double dx = particles->dx[0];
+    double dz = particles->dx[2];
+    double sigma0 = inputs["pressure"];
+    double bz = sigma0 / dz;
+    double br = sigma0 / dx; // Here we assume dx = dy
+    double top = high_corner[2];
+    double bottom = low_corner[2];
+
+    // This is purposely delayed until after solver init so that ghosted
+    // particles are correctly taken into account for lambda capture here.
+    auto force_func = KOKKOS_LAMBDA( const int pid, const double )
+    {
+        // Pressure on top surface
+        if ( x( pid, 2 ) > top - dz )
+        {
+            f( pid, 2 ) += -bz;
+        }
+        // Pressure on bottom surface
+        else if ( x( pid, 2 ) < bottom + dz )
+        {
+            f( pid, 2 ) += bz;
+        }
+
+        double rx = x( pid, 0 ) - x_center;
+        double ry = x( pid, 1 ) - y_center;
+        double rsq = rx * rx + ry * ry;
+
+        // Pressure on outer cylinder: assumes dx = dy
+        if ( rsq > ( Rout - dx ) * ( Rout - dx ) )
+        {
+            double r = std::sqrt( rsq );
+            f( pid, 0 ) += -br * rx / r;
+            f( pid, 1 ) += -br * ry / r;
+        }
+        // Pressure on inner cylinder: assumes dx = dy
+        else if ( rsq < ( Rin + dx ) * ( Rin + dx ) )
+        {
+            double r = std::sqrt( rsq );
+            f( pid, 0 ) += br * rx / r;
+            f( pid, 1 ) += br * ry / r;
+        }
+    };
+    auto body_term = CabanaPD::createBodyTerm( force_func, true );
 
     // ====================================================
     //                   Simulation run
@@ -195,7 +249,7 @@ int main( int argc, char* argv[] )
     MPI_Init( &argc, &argv );
     Kokkos::initialize( argc, argv );
 
-    thermalDeformationHeatTransferExample( argv[1] );
+    thermalDeformationHeatTransferMonoblockExample( argv[1] );
 
     Kokkos::finalize();
     MPI_Finalize();
