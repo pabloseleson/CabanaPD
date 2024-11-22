@@ -134,8 +134,9 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, Dimension>
     std::array<double, dim> local_mesh_ext;
     std::array<double, dim> local_mesh_lo;
     std::array<double, dim> local_mesh_hi;
-    std::array<double, dim> ghost_mesh_lo;
-    std::array<double, dim> ghost_mesh_hi;
+    // FIXME: this is for neighborlist construction.
+    double ghost_mesh_lo[dim];
+    double ghost_mesh_hi[dim];
     std::shared_ptr<
         Cabana::Grid::LocalGrid<Cabana::Grid::UniformMesh<double, dim>>>
         local_grid;
@@ -300,8 +301,9 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, Dimension>
         size = _plist_x.size();
 
         // Not using Allreduce because global count is only used for printing.
-        MPI_Reduce( &n_local, &n_global, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, 0,
-                    MPI_COMM_WORLD );
+        auto n_local_mpi = static_cast<unsigned long long int>( n_local );
+        MPI_Reduce( &n_local_mpi, &n_global, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM,
+                    0, MPI_COMM_WORLD );
         _init_timer.stop();
     }
 
@@ -398,9 +400,9 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, Dimension>
     auto getForce() { return _plist_f; }
     auto getReferencePosition() { return _plist_x; }
 
-    void updateCurrentPosition()
+    void updateCurrentPosition() const
     {
-        _timer.start();
+        //_timer.start();
         // Not using slice function because this is called inside.
         auto y = Cabana::slice<0>( _aosoa_y, "current_positions" );
         auto x = sliceReferencePosition();
@@ -413,7 +415,7 @@ class Particles<MemorySpace, PMB, TemperatureIndependent, Dimension>
         };
         Kokkos::parallel_for( "CabanaPD::CalculateCurrentPositions", policy,
                               sum_x_u );
-        _timer.stop();
+        //_timer.stop();
     }
 
     void resize( int new_local, int new_ghost )
@@ -833,18 +835,15 @@ auto createParticles( const ExecSpace& exec_space,
 
 template <typename MemorySpace, typename ModelType, typename ThermalType,
           typename ExecSpace, std::size_t Dim>
-auto createParticles( const ExecSpace& exec_space,
-                      std::array<double, Dim> low_corner,
-                      std::array<double, Dim> high_corner,
-                      const std::array<int, Dim> num_cells,
-                      const int max_halo_width,
-                      typename std::enable_if<
-                          (std::is_same_v<ThermalType, TemperatureDependent> ||
-                           std::is_same_v<ThermalType, TemperatureIndependent>),
-                          int>::type* = 0 )
+auto createParticles(
+    const ExecSpace& exec_space, std::array<double, Dim> low_corner,
+    std::array<double, Dim> high_corner, const std::array<int, Dim> num_cells,
+    const int max_halo_width,
+    typename std::enable_if<( is_temperature_dependent<ThermalType>::value ),
+                            int>::type* = 0 )
 {
-    return std::make_shared<
-        CabanaPD::Particles<MemorySpace, ModelType, ThermalType>>(
+    return std::make_shared<CabanaPD::Particles<
+        MemorySpace, ModelType, typename ThermalType::base_type>>(
         exec_space, low_corner, high_corner, num_cells, max_halo_width );
 }
 
