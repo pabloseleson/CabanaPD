@@ -155,6 +155,7 @@ class HeatTransfer<
         _timer.start();
 
         auto model = _model;
+        const auto neigh_list = _neigh_list;
         const auto vol = particles.sliceVolume();
         const auto temp = particles.sliceTemperature();
 
@@ -162,12 +163,12 @@ class HeatTransfer<
         {
             std::size_t num_neighbors =
                 Cabana::NeighborList<neighbor_list_type>::numNeighbor(
-                    _neigh_list, i );
+                    neigh_list, i );
             for ( std::size_t n = 0; n < num_neighbors; n++ )
             {
                 std::size_t j =
                     Cabana::NeighborList<neighbor_list_type>::getNeighbor(
-                        _neigh_list, i, n );
+                        neigh_list, i, n );
 
                 // Get the reference positions and displacements.
                 double xi, r, s;
