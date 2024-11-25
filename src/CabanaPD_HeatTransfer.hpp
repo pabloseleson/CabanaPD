@@ -179,8 +179,7 @@ class HeatTransfer<
                 // Only include unbroken bonds.
                 if ( mu( i, n ) > 0 )
                 {
-                    const double coeff = model.thermal_coeff *
-                                         model.microconductivity_function( xi );
+                    const double coeff = model.microconductivity_function( xi );
                     conduction( i ) +=
                         coeff * ( temp( j ) - temp( i ) ) / xi / xi * vol( j );
                 }
