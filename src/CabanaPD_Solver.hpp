@@ -544,7 +544,8 @@ class SolverFracture
             {
                 if ( step % thermal_subcycle_steps == 0 )
                     computeHeatTransfer( *heat_transfer, *particles, mu,
-                                         neigh_iter_tag{}, dt );
+                                         neigh_iter_tag{},
+                                         thermal_subcycle_steps * dt );
             }
 
             // Add non-force boundary condition.
