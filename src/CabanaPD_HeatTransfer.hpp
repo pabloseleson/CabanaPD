@@ -99,6 +99,14 @@ class HeatTransfer<MemorySpace,
         {
             temp( i ) += dt / rho( i ) / model.cp * conduction( i );
         };
+
+        std::cout << "dt = " << dt << " model.delta = " << model.delta
+                  << " model.K = " << model.K
+                  << " model.kappa = " << model.kappa
+                  << " model.cp = " << model.cp
+                  << " model.alpha = " << model.alpha
+                  << " model.temp0 = " << model.temp0 << std::endl;
+
         Kokkos::RangePolicy<exec_space> policy( 0, n_local );
         Kokkos::parallel_for( "CabanaPD::HeatTransfer::forwardEuler", policy,
                               euler_func );
