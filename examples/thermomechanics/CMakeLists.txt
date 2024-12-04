@@ -10,4 +10,7 @@ target_link_libraries(ThermalDeformationHeatTransfer LINK_PUBLIC CabanaPD)
 add_executable(HIPCylinder hip_cylinder.cpp)
 target_link_libraries(HIPCylinder LINK_PUBLIC CabanaPD)
 
-install(TARGETS ThermalDeformation ThermalCrack ThermalDeformationHeatTransfer HIPCylinder DESTINATION ${CMAKE_INSTALL_BINDIR})
+add_executable(HIPContainer hip_container.cpp)
+target_link_libraries(HIPContainer LINK_PUBLIC CabanaPD)
+
+install(TARGETS ThermalDeformation ThermalCrack ThermalDeformationHeatTransfer HIPCylinder HIPContainer DESTINATION ${CMAKE_INSTALL_BINDIR})
