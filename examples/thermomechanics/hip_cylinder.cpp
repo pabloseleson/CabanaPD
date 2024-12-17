@@ -19,7 +19,7 @@
 #include <CabanaPD.hpp>
 
 // Simulate a cylinder under hot isostatic pressing (HIP)
-void fragmentingCylinderExample( const std::string filename )
+void hipCylinderExample( const std::string filename )
 {
     // ====================================================
     //             Use default Kokkos spaces
@@ -36,15 +36,11 @@ void fragmentingCylinderExample( const std::string filename )
     //                Material parameters
     // ====================================================
     double rho0 = inputs["density"];
-    double K = inputs["bulk_modulus"];
-    // double G = inputs["shear_modulus"]; // Only for LPS.
-    double sc = inputs["critical_stretch"];
+    double E = inputs["elastic_modulus"];
+    double nu = 0.25; // Use bond-based model
+    double K = E / ( 3 * ( 1 - 2 * nu ) );
     double delta = inputs["horizon"];
     delta += 1e-10;
-    // For PMB or LPS with influence_type == 1
-    double G0 = 9 * K * delta * ( sc * sc ) / 5;
-    // For LPS with influence_type == 0 (default)
-    // double G0 = 15 * K * delta * ( sc * sc ) / 8;
 
     // ====================================================
     //                  Discretization
@@ -60,11 +56,8 @@ void fragmentingCylinderExample( const std::string filename )
     // ====================================================
     //                    Force model
     // ====================================================
-    using model_type = CabanaPD::ForceModel<CabanaPD::PMB, CabanaPD::Fracture>;
-    model_type force_model( delta, K, G0 );
-    // using model_type =
-    //      CabanaPD::ForceModel<CabanaPD::LPS, CabanaPD::Fracture>;
-    // model_type force_model( delta, K, G, G0 );
+    using model_type = CabanaPD::ForceModel<CabanaPD::PMB, CabanaPD::Elastic>;
+    model_type force_model( delta, K );
 
     // ====================================================
     //                 Particle generation
@@ -102,7 +95,7 @@ void fragmentingCylinderExample( const std::string filename )
     // ====================================================
     //                   Create solver
     // ====================================================
-    auto cabana_pd = CabanaPD::createSolverFracture<memory_space>(
+    auto cabana_pd = CabanaPD::createSolverElastic<memory_space>(
         inputs, particles, force_model );
 
     // ====================================================
@@ -112,16 +105,41 @@ void fragmentingCylinderExample( const std::string filename )
     auto f = particles->sliceForce();
     double dx = particles->dx[0];
     double dz = particles->dx[2];
-    double sigma0 = inputs["pressure"];
-    double bz = sigma0 / dz;
-    double br = sigma0 / dx; // Here we assume dx = dy
+    double Pmax = inputs["maximum_pressure"];
+    double ramp_t0 = inputs["ramp_times"][0];
+    double ramp_t1 = inputs["ramp_times"][1];
+    double ramp_t2 = inputs["ramp_times"][2];
+    double ramp_t3 = inputs["ramp_times"][3];
     double top = high_corner[2];
     double bottom = low_corner[2];
 
     // This is purposely delayed until after solver init so that ghosted
     // particles are correctly taken into account for lambda capture here.
-    auto force_func = KOKKOS_LAMBDA( const int pid, const double )
+    auto force_func = KOKKOS_LAMBDA( const int pid, const double t )
     {
+        double sigma0 = 0;
+        if ( t >= ramp_t0 )
+        {
+            if ( t <= ramp_t1 )
+            {
+                sigma0 = Pmax * ( t - ramp_t0 ) / ( ramp_t1 - ramp_t0 );
+            }
+            else if ( t <= ramp_t2 )
+            {
+                sigma0 = Pmax;
+            }
+            else if ( t <= ramp_t3 )
+            {
+                sigma0 = Pmax - Pmax * ( t - ramp_t2 ) / ( ramp_t3 - ramp_t2 );
+            }
+            else
+            {
+                sigma0 = 0;
+            }
+        }
+        double bz = sigma0 / dz;
+        double br = sigma0 / dx; // Here we assume dx = dy
+
         // Pressure on top surface
         if ( x( pid, 2 ) > top - dz )
         {
@@ -167,7 +185,7 @@ int main( int argc, char* argv[] )
     MPI_Init( &argc, &argv );
     Kokkos::initialize( argc, argv );
 
-    fragmentingCylinderExample( argv[1] );
+    hipCylinderExample( argv[1] );
 
     Kokkos::finalize();
     MPI_Finalize();
