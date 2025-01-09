@@ -160,7 +160,7 @@ void crackBranchingExample( const std::string filename )
     //                   Create solver
     // ====================================================
     auto cabana_pd = CabanaPD::createSolverFracture<memory_space>(
-        inputs, particles, force_model, prenotch );
+        inputs, particles, force_model );
 
     // ====================================================
     //                Boundary conditions
@@ -186,7 +186,7 @@ void crackBranchingExample( const std::string filename )
     // ====================================================
     //                   Simulation run
     // ====================================================
-    cabana_pd->init();
+    cabana_pd->init( prenotch );
     cabana_pd->run( bc );
 }
 
