@@ -19,7 +19,7 @@
 #include <CabanaPD.hpp>
 
 // Simulate crack propagation from multiple pre-notches.
-void multiCrackExample( const std::string filename )
+void randomCrackExample( const std::string filename )
 {
     // ====================================================
     //             Use default Kokkos spaces
@@ -46,16 +46,14 @@ void multiCrackExample( const std::string filename )
     // ====================================================
     //                  Discretization
     // ====================================================
-    // FIXME: set halo width based on delta
     std::array<double, 3> low_corner = inputs["low_corner"];
     std::array<double, 3> high_corner = inputs["high_corner"];
 
     // ====================================================
     //                    Pre-notches
     // ====================================================
-
     // Number of pre-notches
-    int Npn = inputs["number_of_prenotches"];
+    constexpr int Npn = 200;
 
     // Minimum and maximum pre-notch length
     double minl = inputs["minimum_prenotch_length"];
@@ -64,12 +62,9 @@ void multiCrackExample( const std::string filename )
     double thickness = high_corner[2] - low_corner[2];
 
     // Initialize pre-notch arrays
-    // Kokkos::Array<Kokkos::Array<double, 3>, Npn> notch_positions;
-    // Kokkos::Array<Kokkos::Array<double, 3>, Npn> notch_v1;
-    // Kokkos::Array<Kokkos::Array<double, 3>, Npn> notch_v2;
-    Kokkos::View<double***> notch_positions( "notch_positions", Npn, 3, 1 );
-    Kokkos::View<double***> notch_v1( "notch_v1", Npn, 3, 1 );
-    Kokkos::View<double***> notch_v2( "notch_v2", Npn, 3, 1 );
+    Kokkos::Array<Kokkos::Array<double, 3>, Npn> notch_positions;
+    Kokkos::Array<Kokkos::Array<double, 3>, Npn> notch_v1;
+    Kokkos::Array<Kokkos::Array<double, 3>, Npn> notch_v2;
 
     // Reference for random number generator:
     // https://en.cppreference.com/w/cpp/numeric/random/uniform_real_distribution
@@ -96,10 +91,7 @@ void multiCrackExample( const std::string filename )
         Kokkos::Array<double, 3> p0 = { Xc1, Yc1, low_corner[2] };
 
         // Assign pre-notch position
-        // notch_positions[n] = p0;
-        notch_positions( n, 0, 0 ) = p0[0]; // X
-        notch_positions( n, 1, 0 ) = p0[1]; // Y
-        notch_positions( n, 2, 0 ) = p0[2]; // Z
+        notch_positions[n] = p0;
 
         // Random pre-notch length on XY-plane
         double random_number_l = dis( gen );
@@ -111,39 +103,18 @@ void multiCrackExample( const std::string filename )
 
         // Pre-notch v1 vector
         Kokkos::Array<double, 3> v1 = { l * cos( theta ), l * sin( theta ), 0 };
-        // notch_v1[n] = v1;
-        notch_v1( n, 0, 0 ) = v1[0]; // X
-        notch_v1( n, 1, 0 ) = v1[1]; // Y
-        notch_v1( n, 2, 0 ) = v1[2]; // Z
+        notch_v1[n] = v1;
 
         // Pre-notch v2 vector
-
         // Random number for y-component of v2: the angle of v2 in the
         // YZ-plane is between 0 and 45 deg.
         double random_number_v2_y = dis( gen );
         Kokkos::Array<double, 3> v2 = { 0, random_number_v2_y * thickness,
                                         thickness };
-        // notch_v2[n] = v2;
-        notch_v2( n, 0, 0 ) = v2[0]; // X
-        notch_v2( n, 1, 0 ) = v2[1]; // Y
-        notch_v2( n, 2, 0 ) = v2[2]; // Z
+        notch_v2[n] = v2;
     }
 
-    // CabanaPD::Prenotch<Npn> prenotch( notch_v1, notch_v2, notch_positions );
-
-    /*
-
-        double height = inputs["system_size"][0];
-        double thickness = inputs["system_size"][2];
-        double L_prenotch = height / 2.0;
-        double y_prenotch1 = 0.0;
-        Kokkos::Array<double, 3> p01 = { low_corner[0], y_prenotch1,
-                                         low_corner[2] };
-        Kokkos::Array<double, 3> v1 = { L_prenotch, 0, 0 };
-        Kokkos::Array<double, 3> v2 = { 0, 0, thickness };
-        Kokkos::Array<Kokkos::Array<double, 3>, 1> notch_positions2 = { p01 };
-        CabanaPD::Prenotch<1> prenotch( v1, v2, notch_positions2 );
-    */
+    CabanaPD::Prenotch<Npn> prenotch( notch_v1, notch_v2, notch_positions );
 
     // ====================================================
     //                    Force model
@@ -218,8 +189,7 @@ void multiCrackExample( const std::string filename )
     // ====================================================
     //                   Simulation run
     // ====================================================
-    // cabana_pd->init( bc, prenotch );
-    cabana_pd->init( bc );
+    cabana_pd->init( bc, prenotch );
     cabana_pd->run( bc );
 }
 
@@ -229,7 +199,7 @@ int main( int argc, char* argv[] )
     MPI_Init( &argc, &argv );
     Kokkos::initialize( argc, argv );
 
-    multiCrackExample( argv[1] );
+    randomCrackExample( argv[1] );
 
     Kokkos::finalize();
     MPI_Finalize();

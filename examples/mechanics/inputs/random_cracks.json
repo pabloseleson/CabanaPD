@@ -6,7 +6,6 @@
     "fracture_energy"         : {"value": 3.8,   "unit": "J/m^2"},
     "horizon"                 : {"value": 0.001, "unit": "m"},   
     "traction"                : {"value": 2e6,   "unit": "Pa"},
-    "number_of_prenotches"    : {"value": 200},
     "minimum_prenotch_length" : {"value": 0.001, "unit": "m"},
     "maximum_prenotch_length" : {"value": 0.0025, "unit": "m"},
     "final_time"              : {"value": 43e-6, "unit": "s"},
