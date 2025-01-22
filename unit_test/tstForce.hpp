@@ -174,7 +174,7 @@ double computeReferenceWeightedVolume( ModelType model, const int m,
                 double xi = sqrt( xi_x * xi_x + xi_y * xi_y + xi_z * xi_z );
                 if ( xi > 0.0 && xi < model.delta + 1e-14 )
                     weighted_volume +=
-                        model.influence_function( xi ) * xi * xi * vol;
+                        model.influenceFunction( xi ) * xi * xi * vol;
             }
     return weighted_volume;
 }
@@ -198,8 +198,7 @@ double computeReferenceDilatation( ModelType model, const int m,
 
                 if ( xi > 0.0 && xi < model.delta + 1e-14 )
                     theta += 3.0 / weighted_volume *
-                             model.influence_function( xi ) * s0 * xi * xi *
-                             vol;
+                             model.influenceFunction( xi ) * s0 * xi * xi * vol;
             }
     return theta;
 }
@@ -231,7 +230,7 @@ double computeReferenceDilatation( ModelType model, const int m,
 
                 if ( xi > 0.0 && xi < model.delta + 1e-14 )
                     theta += 3.0 / weighted_volume *
-                             model.influence_function( xi ) * s * xi * xi * vol;
+                             model.influenceFunction( xi ) * s * xi * xi * vol;
             }
     return theta;
 }
@@ -287,8 +286,8 @@ double computeReferenceStrainEnergyDensity(
                     W += ( 1.0 / num_neighbors ) * 0.5 * model.theta_coeff /
                              3.0 * ( theta * theta ) +
                          0.5 * ( model.s_coeff / weighted_volume ) *
-                             model.influence_function( xi ) * s0 * s0 * xi *
-                             xi * vol;
+                             model.influenceFunction( xi ) * s0 * s0 * xi * xi *
+                             vol;
                 }
             }
     return W;
@@ -335,7 +334,7 @@ double computeReferenceStrainEnergyDensity(
                     W += ( 1.0 / num_neighbors ) * 0.5 * model.theta_coeff /
                              3.0 * ( theta_i * theta_j ) +
                          0.5 * ( model.s_coeff / weighted_volume ) *
-                             model.influence_function( xi ) * s * s * xi * xi *
+                             model.influenceFunction( xi ) * s * s * xi * xi *
                              vol;
                 }
             }
@@ -384,7 +383,7 @@ double computeReferenceForceX(
                             model.s_coeff * s *
                                 ( 1.0 / weighted_volume +
                                   1.0 / weighted_volume ) ) *
-                          model.influence_function( xi ) * xi * vol * rx / r;
+                          model.influenceFunction( xi ) * xi * vol * rx / r;
                 }
             }
     return fx;
@@ -655,50 +654,19 @@ void checkAnalyticalDilatation( ModelType, QuadraticTag, const double,
 }
 
 template <class ForceType, class ParticleType>
-double computeEnergyAndForce( CabanaPD::NoFracture, ForceType force,
-                              ParticleType& particles, const int )
+double computeEnergyAndForce( ForceType force, ParticleType& particles,
+                              const int )
 {
     computeForce( force, particles, Cabana::SerialOpTag() );
     double Phi = computeEnergy( force, particles, Cabana::SerialOpTag() );
     return Phi;
 }
+
 template <class ForceType, class ParticleType>
-double computeEnergyAndForce( CabanaPD::Fracture, ForceType force,
-                              ParticleType& particles, const int max_neighbors )
+void initializeForce( ForceType& force, ParticleType& particles )
 {
-    Kokkos::View<int**, TEST_MEMSPACE> mu(
-        Kokkos::ViewAllocateWithoutInitializing( "broken_bonds" ),
-        particles.numLocal(), max_neighbors );
-    Kokkos::deep_copy( mu, 1 );
-    computeForce( force, particles, mu, Cabana::SerialOpTag() );
-    double Phi = computeEnergy( force, particles, mu, Cabana::SerialOpTag() );
-    return Phi;
-}
-
-template <class ModelType, class ForceType, class ParticleType>
-void initializeForce(
-    ModelType, ForceType& force, ParticleType& particles,
-    typename std::enable_if<( std::is_same<typename ModelType::fracture_type,
-                                           CabanaPD::NoFracture>::value ),
-                            int>::type* = 0 )
-{
-    force.computeWeightedVolume( particles, Cabana::SerialOpTag() );
-    force.computeDilatation( particles, Cabana::SerialOpTag() );
-}
-
-template <class ModelType, class ForceType, class ParticleType>
-void initializeForce(
-    ModelType, ForceType& force, ParticleType& particles,
-    typename std::enable_if<( std::is_same<typename ModelType::fracture_type,
-                                           CabanaPD::Fracture>::value ),
-                            int>::type* = 0 )
-{
-    auto max_neighbors = force.getMaxLocalNeighbors();
-    Kokkos::View<int**, TEST_MEMSPACE> mu( "broken_bonds", particles.numLocal(),
-                                           max_neighbors );
-    Kokkos::deep_copy( mu, 1 );
-    force.computeWeightedVolume( particles, mu );
-    force.computeDilatation( particles, mu );
+    force.computeWeightedVolume( particles, Cabana::SerialOpTag{} );
+    force.computeDilatation( particles, Cabana::SerialOpTag{} );
 }
 
 template <class ParticleType, class AoSoAType>
@@ -736,14 +704,12 @@ void testForce( ModelType model, const double dx, const double m,
     auto vol = particles.sliceVolume();
     //  No communication needed (as in the main solver) since this test is only
     //  intended for one rank.
-    initializeForce( model, force, particles );
+    initializeForce( force, particles );
 
     unsigned int max_neighbors;
     unsigned long long total_neighbors;
     force.getNeighborStatistics( max_neighbors, total_neighbors );
-    using fracture_type = typename ModelType::fracture_type;
-    double Phi = computeEnergyAndForce( fracture_type{}, force, particles,
-                                        max_neighbors );
+    double Phi = computeEnergyAndForce( force, particles, max_neighbors );
 
     // Make a copy of final results on the host
     std::size_t num_particle = x.size();
