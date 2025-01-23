@@ -19,7 +19,7 @@
 #include <CabanaPD.hpp>
 
 // Simulate crack propagation from multiple pre-notches.
-void randomCrackExample( const std::string filename )
+void randomCracksExample( const std::string filename )
 {
     // ====================================================
     //             Use default Kokkos spaces
@@ -46,6 +46,7 @@ void randomCrackExample( const std::string filename )
     // ====================================================
     //                  Discretization
     // ====================================================
+    // FIXME: set halo width based on delta
     std::array<double, 3> low_corner = inputs["low_corner"];
     std::array<double, 3> high_corner = inputs["high_corner"];
 
@@ -55,10 +56,8 @@ void randomCrackExample( const std::string filename )
     // Number of pre-notches
     constexpr int Npn = 200;
 
-    // Minimum and maximum pre-notch length
     double minl = inputs["minimum_prenotch_length"];
     double maxl = inputs["maximum_prenotch_length"];
-
     double thickness = high_corner[2] - low_corner[2];
 
     // Initialize pre-notch arrays
@@ -66,8 +65,7 @@ void randomCrackExample( const std::string filename )
     Kokkos::Array<Kokkos::Array<double, 3>, Npn> notch_v1;
     Kokkos::Array<Kokkos::Array<double, 3>, Npn> notch_v2;
 
-    // Reference for random number generator:
-    // https://en.cppreference.com/w/cpp/numeric/random/uniform_real_distribution
+    // Set random number generator
     std::random_device rd;
     std::mt19937 gen( rd() );
     std::uniform_real_distribution<> dis( 0.0, 1.0 );
@@ -79,7 +77,7 @@ void randomCrackExample( const std::string filename )
         double random_number_x = dis( gen );
         double random_number_y = dis( gen );
 
-        // Coordinates of one endpoint of the pre-notch (random)
+        // Random coordinates of one endpoint of the pre-notch
         // Note: the addition and subtraction of "maxl" ensures the prenotch
         // does not extend outside the domain
         double Xc1 = ( low_corner[0] + maxl ) +
@@ -101,16 +99,17 @@ void randomCrackExample( const std::string filename )
         double random_number_theta = dis( gen );
         double theta = CabanaPD::pi * random_number_theta;
 
-        // Pre-notch v1 vector
+        // Pre-notch v1 vector on XY-plane
         Kokkos::Array<double, 3> v1 = { l * cos( theta ), l * sin( theta ), 0 };
         notch_v1[n] = v1;
 
-        // Pre-notch v2 vector
-        // Random number for y-component of v2: the angle of v2 in the
-        // YZ-plane is between 0 and 45 deg.
+        // Random number for y-component of v2 vector: the angle of v2 in the
+        // YZ-plane is between -45 and 45 deg.
         double random_number_v2_y = dis( gen );
-        Kokkos::Array<double, 3> v2 = { 0, random_number_v2_y * thickness,
-                                        thickness };
+
+        // Pre-notch v2 vector on YZ-plane
+        Kokkos::Array<double, 3> v2 = {
+            0, ( -1.0 + 2.0 * random_number_v2_y ) * thickness, thickness };
         notch_v2[n] = v2;
     }
 
@@ -199,7 +198,7 @@ int main( int argc, char* argv[] )
     MPI_Init( &argc, &argv );
     Kokkos::initialize( argc, argv );
 
-    randomCrackExample( argv[1] );
+    randomCracksExample( argv[1] );
 
     Kokkos::finalize();
     MPI_Finalize();
