@@ -66,10 +66,10 @@ void randomCrackExample( const std::string filename )
     Kokkos::Array<Kokkos::Array<double, 3>, Npn> notch_v1;
     Kokkos::Array<Kokkos::Array<double, 3>, Npn> notch_v2;
 
-    // Reference for random number generator:
-    // https://en.cppreference.com/w/cpp/numeric/random/uniform_real_distribution
-    std::random_device rd;
-    std::mt19937 gen( rd() );
+    // Changing this seed will re-randomize the cracks.
+    std::size_t seed = 44758454;
+    // Random number generator
+    std::mt19937 gen( seed );
     std::uniform_real_distribution<> dis( 0.0, 1.0 );
 
     // Loop over pre-notches
