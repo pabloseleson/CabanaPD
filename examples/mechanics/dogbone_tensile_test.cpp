@@ -72,13 +72,13 @@ void compactTensionTestExample( const std::string filename )
     double R = inputs["fillet_radius"];
     double D = inputs["distance_between_grips"];
 
+    // x- and y-coordinates of center of domain
+    double midx = 0.5 * ( low_corner[0] + high_corner[0] );
+    double midy = 0.5 * ( low_corner[1] + high_corner[1] );
+
     // Do not create particles outside dogbone tensile test specimen region
     auto init_op = KOKKOS_LAMBDA( const int, const double x[3] )
     {
-        // x- and y-coordinates of center of domain
-        double midx = 0.5 * ( low_corner[0] + high_corner[0] );
-        double midy = 0.5 * ( low_corner[1] + high_corner[1] );
-
         // Filler radius squared
         double Rsq = R * R;
 
@@ -150,6 +150,10 @@ void compactTensionTestExample( const std::string filename )
     auto rho = particles->sliceDensity();
     auto x = particles->sliceReferencePosition();
     auto v = particles->sliceVelocity();
+    auto nofail = particles->sliceNoFail();
+
+    auto dx = particles->dx;
+    double factor = inputs["grid_perturbation_factor"];
 
     // Grips' velocity magnitude
     double v0 = inputs["grip_velocity"];
@@ -162,16 +166,42 @@ void compactTensionTestExample( const std::string filename )
         high_corner[0] - 0.025, high_corner[0], low_corner[1], high_corner[1],
         low_corner[2], high_corner[2] );
 
+    using pool_type = Kokkos::Random_XorShift64_Pool<exec_space>;
+    using random_type = Kokkos::Random_XorShift64<exec_space>;
+    pool_type pool;
+    int seed = 456854;
+    pool.init( seed, particles->localOffset() );
+
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
         // Density
         rho( pid ) = rho0;
+
+        // Perturb particle positions in gauge region
+        auto gen = pool.get_state();
+        for ( std::size_t d = 0; d < 3; d++ )
+        {
+            // if ( x( pid, 0 ) >= midx - 0.5*G &&  x( pid, 0 ) <= midx + 0.5*G
+            // )
+            if ( x( pid, 0 ) >= midx - 0.1 * G &&
+                 x( pid, 0 ) <= midx + 0.1 * G )
+            {
+                auto rand =
+                    Kokkos::rand<random_type, double>::draw( gen, 0.0, 1.0 );
+                x( pid, d ) += ( 2.0 * rand - 1.0 ) * factor * dx[d];
+            }
+        }
+        pool.free_state( gen );
 
         // grips' x-velocity
         if ( left_grip.inside( x, pid ) )
             v( pid, 0 ) = -v0;
         else if ( right_grip.inside( x, pid ) )
             v( pid, 0 ) = v0;
+
+        // No-fail zone
+        if ( x( pid, 0 ) >= low_corner[0] && x( pid, 0 ) <= high_corner[1] )
+            nofail( pid ) = 1;
     };
     particles->updateParticles( exec_space{}, init_functor );
 
@@ -180,6 +210,9 @@ void compactTensionTestExample( const std::string filename )
     // ====================================================
     auto force_model = CabanaPD::createForceModel(
         model_type{}, mechanics_type{}, *particles, delta, K, G0, sigma_y );
+
+    // PMB only
+    // CabanaPD::ForceModel<model_type> force_model( delta, K, G0 );
 
     // ====================================================
     //                   Create solver
@@ -200,9 +233,14 @@ void compactTensionTestExample( const std::string filename )
     //                      Outputs
     // ====================================================
 
+    // Create region for gauge.
+    CabanaPD::Region<CabanaPD::RectangularPrism> half_gage_region(
+        midx, midx + 0.5 * G, low_corner[1], high_corner[1], low_corner[2],
+        high_corner[2] );
+
     auto output = CabanaPD::createOutputTimeSeries(
-        CabanaPD::ForceDisplacementTag{}, "total_displacement.txt", inputs,
-        exec_space{}, *particles, right_grip );
+        CabanaPD::ForceDisplacementTag{}, "gage_force_displacement.txt", inputs,
+        exec_space{}, *particles, half_gage_region );
 
     // ====================================================
     //                   Simulation run
