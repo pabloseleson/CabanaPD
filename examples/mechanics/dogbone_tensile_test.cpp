@@ -200,7 +200,8 @@ void compactTensionTestExample( const std::string filename )
             v( pid, 0 ) = v0;
 
         // No-fail zone
-        if ( x( pid, 0 ) >= low_corner[0] && x( pid, 0 ) <= high_corner[1] )
+        // if ( x( pid, 0 ) >= low_corner[0] && x( pid, 0 ) <= high_corner[0] )
+        if ( x( pid, 0 ) <= midx - 0.1 * G || x( pid, 0 ) >= midx + 0.1 * G )
             nofail( pid ) = 1;
     };
     particles->updateParticles( exec_space{}, init_functor );
