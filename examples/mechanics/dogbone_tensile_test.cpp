@@ -19,7 +19,7 @@
 #include <CabanaPD.hpp>
 
 // Simulate ASTM D638 type I dogbone tensile test.
-void tensileTestExample( const std::string filename )
+void dogboneTensileTestExample( const std::string filename )
 {
     // ====================================================
     //               Choose Kokkos spaces
@@ -207,7 +207,7 @@ int main( int argc, char* argv[] )
     MPI_Init( &argc, &argv );
     Kokkos::initialize( argc, argv );
 
-    tensileTestExample( argv[1] );
+    dogboneTensileTestExample( argv[1] );
 
     Kokkos::finalize();
     MPI_Finalize();
