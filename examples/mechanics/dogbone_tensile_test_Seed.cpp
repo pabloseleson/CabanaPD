@@ -63,6 +63,7 @@ void dogboneTensileTestExample( const std::string filename )
     // ====================================================
     //    Custom particle generation and initialization
     // ====================================================
+    // Domain parameters
     double G = inputs["gage_length"];
     double D = inputs["distance_between_grips"];
     double W = inputs["width_narrow_section"];
@@ -144,31 +145,11 @@ void dogboneTensileTestExample( const std::string filename )
             init_op );
 
     auto rho = particles->sliceDensity();
-    auto x = particles->sliceReferencePosition();
-    auto v = particles->sliceVelocity();
-
-    // Grips' velocity magnitude
-    double v0 = inputs["grip_velocity"];
-
-    // Create region for each grip.
-    double L0 = inputs["system_size"][0];
-    CabanaPD::RegionBoundary<CabanaPD::RectangularPrism> left_grip(
-        low_corner[0], midx - 0.5 * D, low_corner[1], high_corner[1],
-        low_corner[2], high_corner[2] );
-    CabanaPD::RegionBoundary<CabanaPD::RectangularPrism> right_grip(
-        midx + 0.5 * D, high_corner[0], low_corner[1], high_corner[1],
-        low_corner[2], high_corner[2] );
 
     auto init_functor = KOKKOS_LAMBDA( const int pid )
     {
         // Density
         rho( pid ) = rho0;
-
-        // Grips' x-velocity
-        if ( left_grip.inside( x, pid ) )
-            v( pid, 0 ) = 0.0;
-        else if ( right_grip.inside( x, pid ) )
-            v( pid, 0 ) = v0;
     };
     particles->updateParticles( exec_space{}, init_functor );
 
@@ -185,18 +166,39 @@ void dogboneTensileTestExample( const std::string filename )
         CabanaPD::createSolver<memory_space>( inputs, particles, force_model );
 
     // ====================================================
-    //                Boundary conditions
+    //                  Impose field
     // ====================================================
-    // Reset forces on both grips.
-    auto bc =
-        createBoundaryCondition( CabanaPD::ForceValueBCTag{}, 0.0, exec_space{},
-                                 *particles, left_grip, right_grip );
+    // Grip's velocity
+    double v0 = inputs["grip_velocity"];
+
+    // Create BC last to ensure ghost particles are included.
+    auto x = particles->sliceReferencePosition();
+    auto u = particles->sliceDisplacement();
+    auto disp_func = KOKKOS_LAMBDA( const int pid, const double t )
+    {
+        // Right grip
+        if ( x( pid, 0 ) > midx + 0.5 * D )
+        {
+            u( pid, 0 ) = v0 * t;
+            u( pid, 1 ) = 0;
+        }
+
+        // Left grip
+        if ( x( pid, 0 ) < midx - 0.5 * D )
+        {
+            u( pid, 0 ) = 0;
+            u( pid, 1 ) = 0;
+        }
+    };
+
+    auto body_term =
+        CabanaPD::createBodyTerm( disp_func, particles->size(), false );
 
     // ====================================================
     //                   Simulation run
     // ====================================================
-    cabana_pd->init();
-    cabana_pd->run( bc );
+    cabana_pd->init( body_term );
+    cabana_pd->run( body_term );
 }
 
 // Initialize MPI+Kokkos.
