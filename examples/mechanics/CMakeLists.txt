@@ -25,4 +25,7 @@ target_link_libraries(FiberReinforcedComposite LINK_PUBLIC CabanaPD)
 add_executable(CrackBranchingWithInclusion crack_branching_with_inclusion.cpp)
 target_link_libraries(CrackBranchingWithInclusion LINK_PUBLIC CabanaPD)
 
-install(TARGETS ElasticWave KalthoffWinkler CrackBranching FragmentingCylinder RandomCracks DogboneTensileTest PlateWithHole FiberReinforcedComposite CrackBranchingWithInclusion DESTINATION ${CMAKE_INSTALL_BINDIR})
+add_executable(TRISOexample TRISO_example.cpp)
+target_link_libraries(TRISOexample LINK_PUBLIC CabanaPD)
+
+install(TARGETS ElasticWave KalthoffWinkler CrackBranching FragmentingCylinder RandomCracks DogboneTensileTest PlateWithHole FiberReinforcedComposite CrackBranchingWithInclusion TRISOexample DESTINATION ${CMAKE_INSTALL_BINDIR})

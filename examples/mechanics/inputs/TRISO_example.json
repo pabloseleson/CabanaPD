@@ -1,0 +1,19 @@
+{
+    "num_cells"              : {"value": [100, 100, 100]},
+    "system_size"            : {"value": [919.0e-6, 919.0e-6, 919.0e-6], "unit": "m"},
+    "kernel_outer_radius"    : {"value": 248.5e-6,  "unit": "m"},
+    "buffer_outer_radius"    : {"value": 342.5e-6,  "unit": "m"},
+    "IPyC_outer_radius"      : {"value": 383.5e-6,  "unit": "m"},
+    "SiC_outer_radius"       : {"value": 419.5e-6,  "unit": "m"},
+    "OPyC_outer_radius"      : {"value": 459.5e-6,  "unit": "m"},
+    "density"                : {"value": 2440,  "unit": "kg/m^3"},
+    "elastic_modulus"        : {"value": 72e+9, "unit": "Pa"},
+    "fracture_energy"        : {"value": 3.8,   "unit": "J/m^2"},
+    "horizon"                : {"value": 2.757e-05, "unit": "m"},   
+    "traction"               : {"value": 2e6,   "unit": "Pa"},
+    "final_time"             : {"value": 4.5e-7, "unit": "s"},
+    "timestep"               : {"value": 4.5e-8,  "unit": "s"},
+    "timestep_safety_factor" : {"value": 0.85},
+    "output_frequency"       : {"value": 1},
+    "output_reference"       : {"value": true}
+}
