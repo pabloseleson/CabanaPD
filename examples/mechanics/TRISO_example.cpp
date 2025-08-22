@@ -18,6 +18,8 @@
 
 #include <CabanaPD.hpp>
 
+#include <Kokkos_Random.hpp>
+
 // Tristructural-isotropic (TRISO) particle.
 void TRISOParticleExample( const std::string filename )
 {
@@ -72,13 +74,32 @@ void TRISOParticleExample( const std::string filename )
     double y_center = 0.5 * ( low_corner[1] + high_corner[1] );
     double z_center = 0.5 * ( low_corner[2] + high_corner[2] );
 
+    // std::size_t seed = 44758454;
+    //  Random number generator
+    // std::mt19937 gen( seed );
+    // std::uniform_real_distribution<> dis( 0.0, 1.0 );
+
+    std::size_t seed = 44758454;                        // Random seed
+    Kokkos::Random_XorShift64_Pool<> rand_pool( seed ); // Create a random pool
+
     // Do not create particles outside TRISO fuel region
     auto init_op = KOKKOS_LAMBDA( const int, const double x[3] )
     {
+        // Create a random generator specific to this thread
+        auto rand_gen = rand_pool.get_state();
+
+        // Generate a random perturbation in the range [0.0, 1.0]
+        double perturbation = 0.1 * rand_gen.drand( 0.0, 1.0 );
+
+        // Random numbers for pre-notch position
+        // double perturbation = dis( gen );
+
         double rsq = ( x[0] - x_center ) * ( x[0] - x_center ) +
                      ( x[1] - y_center ) * ( x[1] - y_center ) +
                      ( x[2] - z_center ) * ( x[2] - z_center );
-        if ( rsq > OPyC_Rout * OPyC_Rout )
+        // if ( rsq > OPyC_Rout * OPyC_Rout )
+        if ( rsq > ( OPyC_Rout * ( 1.0 - perturbation ) ) *
+                       ( OPyC_Rout * ( 1.0 - perturbation ) ) )
             return false;
         return true;
     };
@@ -86,14 +107,15 @@ void TRISOParticleExample( const std::string filename )
     // ====================================================
     //                 Particle generation
     // ====================================================
-    // CabanaPD::Particles particles(
-    //        memory_space{}, model_type{}, low_corner, high_corner, num_cells,
-    //       halo_width, Cabana::InitRandom{}, init_op, exec_space{} );
+    CabanaPD::Particles particles(
+        memory_space{}, model_type{}, low_corner, high_corner, num_cells,
+        halo_width, Cabana::InitRandom{}, init_op, exec_space{} );
 
+    /*
     CabanaPD::Particles particles(
         memory_space{}, model_type{}, low_corner, high_corner, num_cells,
         halo_width, Cabana::InitUniform{}, init_op, exec_space{} );
-
+    */
     // CabanaPD::Particles particles( memory_space{}, model_type{}, inputs,
     //                               exec_space{} );
 
